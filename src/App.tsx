@@ -1,324 +1,126 @@
-import React, { useState, useMemo } from 'react';
-import { ScriptConfig, TargetMode, HitboxColorName } from './types';
-import { DEFAULT_CONFIG, THEME_OPTIONS } from './utils/constants';
-import { generateLuauScript } from './utils/scriptGenerator';
-import { RobloxScreenSimulator } from './components/RobloxScreenSimulator';
-import { ConfigPanel } from './components/ConfigPanel';
-import { ScriptViewer } from './components/ScriptViewer';
-import {
-  Sword,
-  Copy,
-  Check,
-  Sparkles,
-  Terminal,
-  Sliders,
-  PlayCircle,
-  Flame,
-  Magnet,
-  Crosshair,
-  Palette,
-  Zap,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { LoadstringPlatelet } from './components/LoadstringPlatelet';
+import { CopyCodePlatelet } from './components/CopyCodePlatelet';
+import { DownloadPlatelet } from './components/DownloadPlatelet';
+import { Check, ShieldCheck, Sparkles, ExternalLink } from 'lucide-react';
+import { SCRIPT_RAW_URL } from './utils/scriptData';
 
 export default function App() {
-  const [config, setConfig] = useState<ScriptConfig>(DEFAULT_CONFIG);
-  const [hitboxEnabled, setHitboxEnabled] = useState<boolean>(true);
-  const [activeViewTab, setActiveViewTab] = useState<'simulator' | 'code' | 'settings'>('simulator');
-  const [copiedToast, setCopiedToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // User's repository target link (Pure Luau file in root)
-  const defaultRawUrl = 'https://raw.githubusercontent.com/roshanjaisu/Scripty/main/main.lua';
-  const standardLoadstring = `loadstring(game:HttpGet("${defaultRawUrl}"))()`;
-
-  // Derive selected color object
-  const selectedTheme = useMemo(() => {
-    return THEME_OPTIONS.find((c) => c.id === config.color) || THEME_OPTIONS[0];
-  }, [config.color]);
-
-  // Generate real-time Luau script
-  const generatedScript = useMemo(() => {
-    return generateLuauScript(config);
-  }, [config]);
-
-  const handleConfigChange = (updated: Partial<ScriptConfig>) => {
-    setConfig((prev) => ({ ...prev, ...updated }));
-  };
-
-  const handleResetConfig = () => {
-    setConfig(DEFAULT_CONFIG);
-    setHitboxEnabled(true);
-  };
-
-  const handleApplyPreset = (presetConfig: Partial<ScriptConfig>) => {
-    setConfig((prev) => ({ ...prev, ...presetConfig }));
-    if (presetConfig.autoAttackEnabled !== undefined) {
-      setHitboxEnabled(true);
-    }
-  };
-
-  const handleQuickCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedScript);
-      setCopiedToast('Full Luau Script Copied to Clipboard!');
-      setTimeout(() => setCopiedToast(null), 2200);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = generatedScript;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopiedToast('Full Luau Script Copied to Clipboard!');
-      setTimeout(() => setCopiedToast(null), 2200);
-    }
-  };
-
-  const handleCopyLoadstring = async () => {
-    try {
-      await navigator.clipboard.writeText(standardLoadstring);
-      setCopiedToast('1-Line Loadstring Copied! Ready to execute');
-      setTimeout(() => setCopiedToast(null), 2200);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = standardLoadstring;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopiedToast('1-Line Loadstring Copied! Ready to execute');
-      setTimeout(() => setCopiedToast(null), 2200);
-    }
+  const handleNotify = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => {
+      setToast((current) => (current === msg ? null : current));
+    }, 2500);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-slate-950">
-      {/* Toast Notification */}
-      {copiedToast && (
-        <div className="fixed top-5 right-5 z-50 bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl font-bold shadow-2xl flex items-center gap-2 border border-amber-300 animate-in fade-in slide-in-from-top-3 duration-200">
-          <Check size={18} className="stroke-[3]" />
-          <span>{copiedToast}</span>
+    <div className="min-h-screen bg-[#090b10] text-zinc-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-200 relative overflow-x-hidden">
+      {/* Liquid Glass Ambient Backlight Elements */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-cyan-500/10 blur-[130px]" />
+        <div className="absolute top-[20%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-purple-600/10 blur-[140px]" />
+        <div className="absolute bottom-[-10%] left-[30%] w-[55vw] h-[55vw] rounded-full bg-emerald-500/10 blur-[150px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+      </div>
+
+      {/* Floating Dynamic Liquid Toast Notification */}
+      {toast && (
+        <div
+          id="toast-notification"
+          className="fixed top-5 inset-x-0 mx-auto w-max max-w-[90vw] z-50 flex items-center gap-2.5 px-5 py-3 rounded-full backdrop-blur-2xl bg-black/80 border border-white/20 text-white text-xs font-medium shadow-[0_12px_32px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-top-3 duration-200"
+        >
+          <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+            <Check size={12} className="stroke-[3]" />
+          </div>
+          <span>{toast}</span>
         </div>
       )}
 
-      {/* Top Navigation Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      {/* Top Floating Liquid Glass Pill App Bar */}
+      <header className="relative z-20 w-full pt-4 sm:pt-6 px-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 p-2 pl-3.5 pr-2.5 rounded-full backdrop-blur-2xl bg-white/[0.03] border border-white/[0.1] shadow-[0_8px_24px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/[0.05]">
+          {/* Brand Icon & Name */}
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-lg border transition-colors"
-              style={{
-                backgroundColor: `${selectedTheme.hex}22`,
-                borderColor: selectedTheme.hex,
-                boxShadow: `0 0 16px ${selectedTheme.hex}33`,
-              }}
-            >
-              🗡️
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-base sm:text-lg text-slate-100 tracking-tight">
-                  Blox Fruits Ultimate Combat Suite V3
-                </h1>
-                <span
-                  className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border"
-                  style={{
-                    backgroundColor: `${selectedTheme.hex}20`,
-                    color: selectedTheme.hex,
-                    borderColor: `${selectedTheme.hex}40`,
-                  }}
-                >
-                  {selectedTheme.label} Theme
-                </span>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 p-[1px] shadow-[0_0_15px_rgba(34,211,238,0.25)]">
+              <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center text-cyan-300 font-bold text-xs">
+                BF
               </div>
-              <p className="text-xs text-slate-400">
-                Hitbox Expander &bull; Auto M1 Clicker &bull; Mob Magnet &bull; 3D ESP &bull; 1-Line Loadstring
-              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm tracking-tight text-white">
+                Blox Fruits Script
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-zinc-400 bg-white/[0.05] border border-white/[0.08]">
+                v3.2
+              </span>
             </div>
           </div>
 
-          {/* Header Action Buttons */}
-          <div className="flex items-center gap-2.5">
-            {/* Quick Feature Badges */}
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${config.autoAttackEnabled ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'text-slate-500'}`}>
-                M1 Clicker
-              </span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${config.mobMagnetEnabled ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-500'}`}>
-                Magnet
-              </span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${config.espEnabled ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'text-slate-500'}`}>
-                3D ESP
-              </span>
+          {/* Right Status Badges */}
+          <div className="flex items-center gap-2 text-xs">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-300 text-[11px] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>GitHub Synced</span>
             </div>
-
-            {/* Quick Theme Switcher Pill in Top Header */}
-            <div className="flex items-center gap-1 p-1 bg-slate-900 rounded-lg border border-slate-800">
-              {THEME_OPTIONS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleConfigChange({ color: t.id as HitboxColorName })}
-                  className={`w-5 h-5 rounded-full transition-transform ${
-                    config.color === t.id ? 'scale-125 ring-2 ring-white shadow-md' : 'opacity-60 hover:opacity-100'
-                  }`}
-                  style={{ backgroundColor: t.hex }}
-                  title={`Switch Theme: ${t.label}`}
-                />
-              ))}
-            </div>
-
-            {/* Copy Loadstring Hub Button */}
-            <button
-              onClick={handleCopyLoadstring}
-              className="px-3.5 py-2 rounded-lg font-black text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95 bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-amber-500/20"
-              title="Copy 1-line loadstring for Roblox executors"
+            <a
+              id="header-raw-link"
+              href={SCRIPT_RAW_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] transition-all flex items-center gap-1.5 active:scale-95"
             >
-              <Zap size={14} className="fill-slate-950" />
-              <span>Copy Loadstring</span>
-            </button>
-
-            {/* Copy Full Script Button */}
-            <button
-              onClick={handleQuickCopy}
-              className="px-3.5 py-2 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-              title="Copy full uncompiled Luau code"
-            >
-              <Copy size={14} />
-              <span className="hidden sm:inline">Full Code</span>
-            </button>
+              <span>Raw Endpoint</span>
+              <ExternalLink size={12} />
+            </a>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
-            <button
-              onClick={() => setActiveViewTab('simulator')}
-              className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-                activeViewTab === 'simulator'
-                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <PlayCircle size={15} />
-              <span>Interactive 3D Simulator</span>
-            </button>
-            <button
-              onClick={() => setActiveViewTab('code')}
-              className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-                activeViewTab === 'code'
-                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Terminal size={15} />
-              <span>Loadstring Hub & Code</span>
-            </button>
-            <button
-              onClick={() => setActiveViewTab('settings')}
-              className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-                activeViewTab === 'settings'
-                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sliders size={15} />
-              <span>Customizer & Presets</span>
-            </button>
+      <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
+        {/* Hero Title & Subtitle */}
+        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white/[0.04] border border-white/[0.1] text-cyan-300 backdrop-blur-md mb-4 shadow-xs">
+            <Sparkles size={13} />
+            <span>Material 3 & Liquid Glass Design</span>
           </div>
-
-          <div className="hidden lg:flex items-center gap-2 text-xs text-slate-400 font-medium">
-            <Sparkles size={14} className="text-amber-400" />
-            <span>Theme: <strong>{selectedTheme.label}</strong> &bull; Size: <strong>{config.hitboxSize} Studs</strong></span>
-          </div>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 sm:mb-4 leading-tight">
+            Blox Fruits Script Portal
+          </h1>
+          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+            Three dedicated platelets for seamless script deployment. Copy the one-line loadstring, inspect the Luau source code, or download the raw file.
+          </p>
         </div>
 
-        {/* Dynamic Content Views */}
-        {activeViewTab === 'simulator' && (
-          <div className="space-y-6">
-            {/* Top: The Interactive Simulator with Replica ScreenGui */}
-            <RobloxScreenSimulator
-              hitboxEnabled={hitboxEnabled}
-              onToggleHitbox={setHitboxEnabled}
-              targetMode={config.targetMode}
-              onTargetModeChange={(m: TargetMode) => handleConfigChange({ targetMode: m })}
-              hitboxSize={config.hitboxSize}
-              onHitboxSizeChange={(s: number) => handleConfigChange({ hitboxSize: s })}
-              transparency={config.transparency}
-              onTransparencyChange={(t: number) => handleConfigChange({ transparency: t })}
-              selectedColor={selectedTheme}
-              onColorChange={(colorId: HitboxColorName) => handleConfigChange({ color: colorId })}
-              autoAttackEnabled={config.autoAttackEnabled}
-              onToggleAutoAttack={(val: boolean) => handleConfigChange({ autoAttackEnabled: val })}
-              mobMagnetEnabled={config.mobMagnetEnabled}
-              onToggleMobMagnet={(val: boolean) => handleConfigChange({ mobMagnetEnabled: val })}
-              espEnabled={config.espEnabled}
-              onToggleEsp={(val: boolean) => handleConfigChange({ espEnabled: val })}
-              safeSkyFloat={config.safeSkyFloat}
-              onToggleSafeSkyFloat={(val: boolean) => handleConfigChange({ safeSkyFloat: val })}
-              keybind={config.keybind}
-              mobileToggleEnabled={config.includeMobileToggle}
-            />
+        {/* The 3 Good Platelets Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-7 items-stretch">
+          {/* Platelet 1: Copy Loadstring */}
+          <LoadstringPlatelet onNotify={handleNotify} />
 
-            {/* Quick Summary & Code Preview Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
-              </div>
-              <div className="lg:col-span-1">
-                <ConfigPanel
-                  config={config}
-                  onChange={handleConfigChange}
-                  onReset={handleResetConfig}
-                  onApplyPreset={handleApplyPreset}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+          {/* Platelet 2: Copy Code Option */}
+          <CopyCodePlatelet onNotify={handleNotify} />
 
-        {activeViewTab === 'code' && (
-          <div className="space-y-6">
-            <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
-            <ConfigPanel
-              config={config}
-              onChange={handleConfigChange}
-              onReset={handleResetConfig}
-              onApplyPreset={handleApplyPreset}
-            />
-          </div>
-        )}
+          {/* Platelet 3: Download Link of Code */}
+          <DownloadPlatelet onNotify={handleNotify} />
+        </div>
 
-        {activeViewTab === 'settings' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <ConfigPanel
-                config={config}
-                onChange={handleConfigChange}
-                onReset={handleResetConfig}
-                onApplyPreset={handleApplyPreset}
-              />
-            </div>
-            <div className="lg:col-span-1">
-              <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
-            </div>
+        {/* Bottom Trust & Verification Banner */}
+        <div className="mt-12 sm:mt-16 p-4 sm:p-5 rounded-3xl backdrop-blur-xl bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+          <div className="flex items-center gap-2 text-zinc-300">
+            <ShieldCheck size={16} className="text-emerald-400" />
+            <span className="font-medium">100% Client-Side Luau • CanCollide Safe • No Account Access Needed</span>
           </div>
-        )}
+          <div className="text-[11px] text-zinc-500 font-mono">
+            Direct Endpoint: <code className="text-zinc-400">roshanjaisu/Scripty/main</code>
+          </div>
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Sword size={14} className="text-cyan-400" />
-            <span>Blox Fruits ScreenGui Hitbox Expander &bull; Luau Game Mechanics Engine</span>
-          </div>
-          <div className="text-slate-500 text-[11px]">
-            CoreGui auto-fallback &bull; Safe CFrame revert &bull; Smooth tweens &bull; Mobile widget support
-          </div>
-        </div>
+      {/* Liquid Glass Footer */}
+      <footer className="relative z-10 py-6 border-t border-white/[0.06] text-center text-xs text-zinc-500">
+        <p>Material 3 & Liquid Glass Script Portal &bull; Universal Executor Ready</p>
       </footer>
     </div>
   );

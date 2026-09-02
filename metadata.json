@@ -1,6 +1,6 @@
 {
   "name": "Blox Fruits Hitbox Script & UI Studio",
-  "description": "Customizable Blox Fruits hitbox expander script generator with draggable ScreenGui toggle UI and live interactive preview simulator.",
+  "description": "Material 3 and liquid glass script portal for Blox Fruits with instant 1-click copy loadstring, source code viewer, and direct file download.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

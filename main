@@ -2,10 +2,11 @@
   ========================================================================
   DIAGNOSTIC TEST SCRIPT (VERIFY EXECUTOR & GITHUB LOADSTRING)
   ========================================================================
-  If this works:
-  1. You will see an in-game notification popup on your screen.
-  2. You will see a bright test window in the middle of your screen.
-  3. "TEST SCRIPT EXECUTED SUCCESSFULLY!" will print in the console (F9).
+  Target URL:
+  https://raw.githubusercontent.com/roshanjaisu/Scripty/refs/heads/main/main
+  
+  LOADSTRING FORMAT:
+  loadstring(game:HttpGet("https://raw.githubusercontent.com/roshanjaisu/Scripty/refs/heads/main/main"))()
   ========================================================================
 ]]--
 
