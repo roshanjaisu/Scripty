@@ -27,20 +27,55 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
 
+-- Safe LocalPlayer retrieval
 local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+    repeat
+        task.wait(0.1)
+        LocalPlayer = Players.LocalPlayer
+    until LocalPlayer
+end
 
--- GUI Container with CoreGui fallback
-local parentGui = nil
-pcall(function() parentGui = CoreGui end)
-if not parentGui or not pcall(function() return parentGui:GetChildren() end) then
-    parentGui = LocalPlayer:WaitForChild("PlayerGui")
+-- Universal safe GUI container detection (Delta, Hydrogen, Codex, Arceus X, Fluxus, etc.)
+local function getSafeGui()
+    if type(gethui) == "function" then
+        local success, res = pcall(gethui)
+        if success and res then return res end
+    end
+    
+    local coreSuccess, core = pcall(function() return CoreGui end)
+    if coreSuccess and core then
+        local testSuccess = pcall(function()
+            local test = Instance.new("Folder")
+            test.Parent = core
+            test:Destroy()
+        end)
+        if testSuccess then
+            return core
+        end
+    end
+    
+    return LocalPlayer:WaitForChild("PlayerGui", 10) or LocalPlayer:FindFirstChildOfClass("PlayerGui")
+end
+
+local parentGui = getSafeGui()
+if not parentGui then
+    parentGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 end
 
 -- Cleanup prior existing instance
 local GUI_NAME = "BloxFruits_UltimateHub_V3"
 local oldGui = parentGui:FindFirstChild(GUI_NAME)
-if oldGui then oldGui:Destroy() end
+if oldGui then pcall(function() oldGui:Destroy() end) end
+
+if parentGui ~= LocalPlayer:FindFirstChildOfClass("PlayerGui") then
+    local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pGui and pGui:FindFirstChild(GUI_NAME) then
+        pcall(function() pGui[GUI_NAME]:Destroy() end)
+    end
+end
 
 -- Master Configuration
 local Config = {
@@ -139,8 +174,8 @@ local function BringEnemyToFront(enemyModel)
         if dist <= Config.MagnetRadius and dist > 3 then
             -- Freeze physics to prevent mobs from walking away or flinging
             humanoid.PlatformStand = true
-            enemyRoot.Velocity = Vector3.zero
-            enemyRoot.RotVelocity = Vector3.zero
+            enemyRoot.Velocity = Vector3.new(0, 0, 0)
+            enemyRoot.RotVelocity = Vector3.new(0, 0, 0)
             
             -- Pull smoothly 5 studs in front of player
             local targetCFrame = myRoot.CFrame * CFrame.new(0, -1, -5)
@@ -393,6 +428,9 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Enabled = true
 ScreenGui.Parent = parentGui
 
 -- Main Card Frame
@@ -1151,6 +1189,18 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[Blox Fruits V3 Suite]: Loaded successfully! Click floating 🗡️ or press ${config.keybind} to toggle menu.")
+-- Start Execution Immediately
+StartMasterLoop()
+
+-- Native Roblox Toast Notification
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Blox Fruits V3 Suite",
+        Text = "Script Loaded! Press [${config.keybind}] or tap 🗡️",
+        Duration = 6
+    })
+end)
+
+print("[Blox Fruits V3 Suite]: Loaded successfully! Tap floating 🗡️ or press ${config.keybind} to toggle menu.")
 `;
 }

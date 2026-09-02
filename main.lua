@@ -1,6 +1,6 @@
 --[[
   ========================================================================
-  BLOX FRUITS - ULTIMATE COMBAT & FARMING SUITE (V3.2)
+  BLOX FRUITS - ULTIMATE COMBAT & FARMING SUITE (V3.2 PRODUCTION)
   [✔] Hitbox Expander with Safe ForceField & Clean Revert
   [✔] Feature 1: Auto-Attack M1 Fast Clicker (Equipped Weapon / Melee / Fruit)
   [✔] Feature 2: Mob Magnet / Bring Mobs (Safe NPC Pull & Cluster)
@@ -22,37 +22,74 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
 
+-- Safe LocalPlayer retrieval (waits if executing on startup)
 local LocalPlayer = Players.LocalPlayer
-
--- GUI Container with CoreGui fallback
-local parentGui = nil
-pcall(function() parentGui = CoreGui end)
-if not parentGui or not pcall(function() return parentGui:GetChildren() end) then
-    parentGui = LocalPlayer:WaitForChild("PlayerGui")
+if not LocalPlayer then
+    repeat
+        task.wait(0.1)
+        LocalPlayer = Players.LocalPlayer
+    until LocalPlayer
 end
 
--- Cleanup prior existing instance
+-- Universal safe GUI container detection (Delta, Hydrogen, Codex, Arceus X, Fluxus, etc.)
+local function getSafeGui()
+    if type(gethui) == "function" then
+        local success, res = pcall(gethui)
+        if success and res then return res end
+    end
+    
+    local coreSuccess, core = pcall(function() return CoreGui end)
+    if coreSuccess and core then
+        local testSuccess = pcall(function()
+            local test = Instance.new("Folder")
+            test.Parent = core
+            test:Destroy()
+        end)
+        if testSuccess then
+            return core
+        end
+    end
+    
+    return LocalPlayer:WaitForChild("PlayerGui", 10) or LocalPlayer:FindFirstChildOfClass("PlayerGui")
+end
+
+local parentGui = getSafeGui()
+if not parentGui then
+    warn("[Blox Fruits Hub]: Failed to locate safe GUI parent. Defaulting to PlayerGui.")
+    parentGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- Cleanup prior existing instances
 local GUI_NAME = "BloxFruits_UltimateHub_V3"
 local oldGui = parentGui:FindFirstChild(GUI_NAME)
-if oldGui then oldGui:Destroy() end
+if oldGui then pcall(function() oldGui:Destroy() end) end
+
+-- Fallback check in PlayerGui if parentGui was CoreGui
+if parentGui ~= LocalPlayer:FindFirstChildOfClass("PlayerGui") then
+    local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pGui and pGui:FindFirstChild(GUI_NAME) then
+        pcall(function() pGui[GUI_NAME]:Destroy() end)
+    end
+end
 
 -- Master Configuration
 local Config = {
-    -- Hitbox
-    HitboxEnabled = false,
+    -- Hitbox Expander (Enabled by default for immediate feedback)
+    HitboxEnabled = true,
     TargetMode = "enemies", -- "self", "enemies", "both"
     HitboxSize = 28,
-    Transparency = 0.6,
+    Transparency = 0.55,
     CanCollide = false,
     
     -- Feature 1: Auto Attack Fast Clicker
     AutoAttackEnabled = true,
     AttackDelay = 0.15,
     
-    -- Feature 2: Mob Magnet
+    -- Feature 2: Mob Magnet (Bring Mobs)
     MobMagnetEnabled = true,
-    MagnetRadius = 60,
+    MagnetRadius = 65,
     
     -- Feature 4: 3D ESP & Health
     EspEnabled = true,
@@ -68,9 +105,8 @@ local Config = {
     ThemeColor = Color3.fromRGB(6, 182, 212)
 }
 
--- Original Properties Cache for 100% clean hitbox revert
+-- Original Properties Cache for clean hitbox revert
 local OriginalPartProperties = {}
-local OriginalMobCFrames = {}
 
 -- =====================================================================
 -- 1. HITBOX EXPANDER ENGINE
@@ -132,12 +168,11 @@ local function BringEnemyToFront(enemyModel)
     if humanoid and enemyRoot and myRoot and humanoid.Health > 0 then
         local dist = (enemyRoot.Position - myRoot.Position).Magnitude
         if dist <= Config.MagnetRadius and dist > 3 then
-            -- Freeze physics to prevent mobs from walking away or flinging
             humanoid.PlatformStand = true
-            enemyRoot.Velocity = Vector3.zero
-            enemyRoot.RotVelocity = Vector3.zero
+            enemyRoot.Velocity = Vector3.new(0, 0, 0)
+            enemyRoot.RotVelocity = Vector3.new(0, 0, 0)
             
-            -- Pull smoothly 5 studs in front of player
+            -- Smoothly pull 5 studs in front of player
             local targetCFrame = myRoot.CFrame * CFrame.new(0, -1, -5)
             enemyRoot.CFrame = enemyRoot.CFrame:Lerp(targetCFrame, 0.25)
         end
@@ -145,13 +180,41 @@ local function BringEnemyToFront(enemyModel)
 end
 
 local function ReleaseMagnetMobs()
-    local enemies = workspace:FindFirstChild("Enemies")
-    if enemies then
-        for _, enemy in ipairs(enemies:GetChildren()) do
-            local hum = enemy:FindFirstChildOfClass("Humanoid")
-            if hum then hum.PlatformStand = false end
+    local function clearFolder(f)
+        if f then
+            for _, enemy in ipairs(f:GetChildren()) do
+                local hum = enemy:FindFirstChildOfClass("Humanoid")
+                if hum then hum.PlatformStand = false end
+            end
         end
     end
+    clearFolder(workspace:FindFirstChild("Enemies"))
+    clearFolder(workspace:FindFirstChild("Characters"))
+end
+
+-- Universal enemy finder covering Blox Fruits Seas 1, 2, 3 & Raids
+local function GetAllEnemies()
+    local list = {}
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+            if enemy:IsA("Model") and enemy:FindFirstChildOfClass("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                table.insert(list, enemy)
+            end
+        end
+    end
+    
+    local charactersFolder = workspace:FindFirstChild("Characters")
+    if charactersFolder then
+        for _, obj in ipairs(charactersFolder:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+                if not Players:GetPlayerFromCharacter(obj) then
+                    table.insert(list, obj)
+                end
+            end
+        end
+    end
+    return list
 end
 
 -- =====================================================================
@@ -170,7 +233,7 @@ local function CreateEspTag(character, isPlayer)
     billboard.Size = UDim2.new(0, 140, 0, 42)
     billboard.StudsOffset = Vector3.new(0, 3.2, 0)
     billboard.AlwaysOnTop = true
-    billboard.MaxDistance = 500
+    billboard.MaxDistance = 600
     
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 1, 0)
@@ -199,7 +262,6 @@ local function CreateEspTag(character, isPlayer)
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.Parent = container
     
-    -- Health Bar Frame
     local hpBg = Instance.new("Frame")
     hpBg.Size = UDim2.new(1, -12, 0, 6)
     hpBg.Position = UDim2.new(0, 6, 0, 20)
@@ -212,7 +274,8 @@ local function CreateEspTag(character, isPlayer)
     
     local hpFill = Instance.new("Frame")
     hpFill.Name = "HpFill"
-    hpFill.Size = UDim2.new(math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1), 0, 1, 0)
+    local hpPct = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+    hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
     hpFill.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
     hpFill.BorderSizePixel = 0
     hpFill.Parent = hpBg
@@ -220,7 +283,6 @@ local function CreateEspTag(character, isPlayer)
     hpFillCorner.CornerRadius = UDim.new(1, 0)
     hpFillCorner.Parent = hpFill
     
-    -- Distance / Sub text
     local distLabel = Instance.new("TextLabel")
     distLabel.Name = "DistLabel"
     distLabel.Size = UDim2.new(1, -6, 0, 12)
@@ -238,7 +300,7 @@ end
 
 local function ClearAllEsp()
     for _, item in pairs(ActiveEspTags) do
-        if item.Billboard then item.Billboard:Destroy() end
+        if item.Billboard then pcall(function() item.Billboard:Destroy() end) end
     end
     ActiveEspTags = {}
 end
@@ -257,25 +319,31 @@ local function PerformAutoAttack()
     local char = LocalPlayer.Character
     if not char then return end
     
-    -- Find currently equipped tool
+    -- 1. Activate equipped weapon or fruit
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
-        tool:Activate()
+        pcall(function() tool:Activate() end)
     end
     
-    -- Also trigger virtual mouse click for maximum hit registration
+    -- 2. Virtual mouse click simulation
     pcall(function()
         VirtualUser:CaptureController()
         VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
         task.wait(0.02)
         VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
     end)
+    
+    -- 3. mouse1click hook for advanced mobile/PC executors
+    if type(mouse1click) == "function" then
+        pcall(mouse1click)
+    end
 end
 
 -- =====================================================================
 -- MASTER BACKGROUND HEARTBEAT LOOP
 -- =====================================================================
 local masterConnection = nil
+
 local function StartMasterLoop()
     if masterConnection then masterConnection:Disconnect() end
     
@@ -294,40 +362,38 @@ local function StartMasterLoop()
             if r then ApplyHitbox(r) end
         end
         
-        -- 2. Process Enemies
-        local enemiesFolder = workspace:FindFirstChild("Enemies")
+        -- 2. Process All Enemies
+        local enemies = GetAllEnemies()
         local hasNearbyEnemy = false
         
-        if enemiesFolder then
-            for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-                local eHumanoid = enemy:FindFirstChildOfClass("Humanoid")
-                local eRoot = enemy:FindFirstChild("HumanoidRootPart")
+        for _, enemy in ipairs(enemies) do
+            local eHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+            local eRoot = enemy:FindFirstChild("HumanoidRootPart")
+            
+            if eHumanoid and eRoot and eHumanoid.Health > 0 then
+                -- Hitbox
+                if Config.HitboxEnabled and (Config.TargetMode == "enemies" or Config.TargetMode == "both") then
+                    ApplyHitbox(eRoot)
+                end
                 
-                if eHumanoid and eRoot and eHumanoid.Health > 0 then
-                    -- Hitbox
-                    if Config.HitboxEnabled and (Config.TargetMode == "enemies" or Config.TargetMode == "both") then
-                        ApplyHitbox(eRoot)
-                    end
-                    
-                    -- Mob Magnet
-                    if Config.MobMagnetEnabled then
-                        BringEnemyToFront(enemy)
-                    end
-                    
-                    -- 3D ESP
-                    if Config.EspEnabled then
-                        CreateEspTag(enemy, false)
-                    end
-                    
-                    -- Auto Attack Check
-                    if myRoot and (eRoot.Position - myRoot.Position).Magnitude <= (Config.HitboxSize + 10) then
-                        hasNearbyEnemy = true
-                    end
+                -- Mob Magnet
+                if Config.MobMagnetEnabled then
+                    BringEnemyToFront(enemy)
+                end
+                
+                -- 3D ESP
+                if Config.EspEnabled then
+                    CreateEspTag(enemy, false)
+                end
+                
+                -- Auto Attack Distance Check
+                if myRoot and (eRoot.Position - myRoot.Position).Magnitude <= (Config.HitboxSize + 12) then
+                    hasNearbyEnemy = true
                 end
             end
         end
         
-        -- Process Players
+        -- 3. Process Players
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local pHum = player.Character:FindFirstChildOfClass("Humanoid")
@@ -343,62 +409,56 @@ local function StartMasterLoop()
             end
         end
         
-        -- Update active ESP bars & distances
+        -- 4. Update 3D ESP health meters & distances
         if Config.EspEnabled and myRoot then
             for char, item in pairs(ActiveEspTags) do
                 if item.Root and item.Root.Parent and item.Humanoid and item.Humanoid.Health > 0 then
                     local dist = math.floor((item.Root.Position - myRoot.Position).Magnitude)
-                    local hpPct = math.clamp(item.Humanoid.Health / item.Humanoid.MaxHealth, 0, 1)
+                    local hpPct = math.clamp(item.Humanoid.Health / math.max(item.Humanoid.MaxHealth, 1), 0, 1)
                     item.Fill.Size = UDim2.new(hpPct, 0, 1, 0)
                     item.Fill.BackgroundColor3 = Color3.fromHSV(hpPct * 0.33, 0.9, 0.9)
                     
                     if Config.EspShowDistance then
-                        item.Dist.Text = math.floor(item.Humanoid.Health) .. " HP [" .. dist .. " Studs]"
+                        item.Dist.Text = math.floor(item.Humanoid.Health) .. " HP [" .. dist .. "m]"
                     else
                         item.Dist.Text = math.floor(item.Humanoid.Health) .. " HP"
                     end
                 else
-                    if item.Billboard then item.Billboard:Destroy() end
+                    if item.Billboard then pcall(function() item.Billboard:Destroy() end) end
                     ActiveEspTags[char] = nil
                 end
             end
         end
         
-        -- Trigger Auto Attack
+        -- 5. Trigger Auto Attack
         if Config.AutoAttackEnabled and hasNearbyEnemy then
             PerformAutoAttack()
         end
     end)
 end
 
-local function StopMasterLoop()
-    if masterConnection then
-        masterConnection:Disconnect()
-        masterConnection = nil
-    end
-    RevertAllHitboxes()
-    ReleaseMagnetMobs()
-    ClearAllEsp()
-end
-
 -- =====================================================================
--- SCREENGUI INTERFACE WITH MULTI-TAB & THEME SWITCHER
+-- SCREENGUI INTERFACE
 -- =====================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = GUI_NAME
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Enabled = true
 ScreenGui.Parent = parentGui
 
 -- Main Card Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 360, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -180, 0.5, -210)
+MainFrame.Size = UDim2.new(0, 340, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -170, 0.5, -200)
 MainFrame.BackgroundColor3 = Color3.fromRGB(13, 16, 24)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.ClipsDescendants = true
+MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 
 local MainCorner = Instance.new("UICorner")
@@ -623,8 +683,8 @@ local HcSub = Instance.new("TextLabel")
 HcSub.Size = UDim2.new(0.65, 0, 0, 14)
 HcSub.Position = UDim2.new(0, 10, 0, 26)
 HcSub.BackgroundTransparency = 1
-HcSub.Text = "Status: OFF"
-HcSub.TextColor3 = Color3.fromRGB(140, 155, 175)
+HcSub.Text = Config.HitboxEnabled and "Status: ACTIVE" or "Status: OFF"
+HcSub.TextColor3 = Config.HitboxEnabled and Color3.fromRGB(52, 211, 153) or Color3.fromRGB(140, 155, 175)
 HcSub.TextSize = 10
 HcSub.Font = Enum.Font.Gotham
 HcSub.TextXAlignment = Enum.TextXAlignment.Left
@@ -633,7 +693,7 @@ HcSub.Parent = HitboxCard
 local HcSwitch = Instance.new("TextButton")
 HcSwitch.Size = UDim2.new(0, 56, 0, 28)
 HcSwitch.Position = UDim2.new(1, -66, 0.5, -14)
-HcSwitch.BackgroundColor3 = Color3.fromRGB(35, 42, 58)
+HcSwitch.BackgroundColor3 = Config.HitboxEnabled and Color3.fromRGB(16, 185, 129) or Color3.fromRGB(35, 42, 58)
 HcSwitch.Text = ""
 HcSwitch.Parent = HitboxCard
 local HcSwitchCorner = Instance.new("UICorner")
@@ -642,8 +702,8 @@ HcSwitchCorner.Parent = HcSwitch
 
 local HcCircle = Instance.new("Frame")
 HcCircle.Size = UDim2.new(0, 22, 0, 22)
-HcCircle.Position = UDim2.new(0, 3, 0.5, -11)
-HcCircle.BackgroundColor3 = Color3.fromRGB(180, 195, 215)
+HcCircle.Position = Config.HitboxEnabled and UDim2.new(1, -25, 0.5, -11) or UDim2.new(0, 3, 0.5, -11)
+HcCircle.BackgroundColor3 = Config.HitboxEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 195, 215)
 HcCircle.BorderSizePixel = 0
 HcCircle.Parent = HcSwitch
 local HcCircleCorner = Instance.new("UICorner")
@@ -657,7 +717,6 @@ local function SetHitbox(enabled)
         TweenService:Create(HcCircle, TweenInfo.new(0.2), {Position = UDim2.new(1, -25, 0.5, -11), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
         HcSub.Text = "Status: ACTIVE"
         HcSub.TextColor3 = Color3.fromRGB(52, 211, 153)
-        StartMasterLoop()
     else
         TweenService:Create(HcSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 42, 58)}):Play()
         TweenService:Create(HcCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -11), BackgroundColor3 = Color3.fromRGB(180, 195, 215)}):Play()
@@ -727,7 +786,6 @@ AcSwitch.MouseButton1Click:Connect(function()
     if Config.AutoAttackEnabled then
         TweenService:Create(AcSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(16, 185, 129)}):Play()
         TweenService:Create(AcCircle, TweenInfo.new(0.2), {Position = UDim2.new(1, -25, 0.5, -11), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        StartMasterLoop()
     else
         TweenService:Create(AcSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 42, 58)}):Play()
         TweenService:Create(AcCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -11), BackgroundColor3 = Color3.fromRGB(180, 195, 215)}):Play()
@@ -861,7 +919,6 @@ McSwitch.MouseButton1Click:Connect(function()
     if Config.MobMagnetEnabled then
         TweenService:Create(McSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(16, 185, 129)}):Play()
         TweenService:Create(McCircle, TweenInfo.new(0.2), {Position = UDim2.new(1, -25, 0.5, -11), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        StartMasterLoop()
     else
         TweenService:Create(McSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 42, 58)}):Play()
         TweenService:Create(McCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -11), BackgroundColor3 = Color3.fromRGB(180, 195, 215)}):Play()
@@ -1004,7 +1061,6 @@ EcSwitch.MouseButton1Click:Connect(function()
     if Config.EspEnabled then
         TweenService:Create(EcSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(16, 185, 129)}):Play()
         TweenService:Create(EcCircle, TweenInfo.new(0.2), {Position = UDim2.new(1, -25, 0.5, -11), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        StartMasterLoop()
     else
         TweenService:Create(EcSwitch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 42, 58)}):Play()
         TweenService:Create(EcCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -11), BackgroundColor3 = Color3.fromRGB(180, 195, 215)}):Play()
@@ -1051,16 +1107,13 @@ local function ApplyThemeColor(color)
     Config.ThemeColor = color
     MainStroke.Color = color
     
-    -- Update active tab button
     if tabButtons[activeTab] then
         tabButtons[activeTab].BackgroundColor3 = color
     end
     
-    -- Update floating widget
     local fw = ScreenGui:FindFirstChild("FloatingMiniToggle")
     if fw then fw.BackgroundColor3 = color end
     
-    -- Update hitboxes live
     if Config.HitboxEnabled then
         for part, _ in pairs(OriginalPartProperties) do
             if part and part.Parent then
@@ -1085,7 +1138,6 @@ for _, th in ipairs(themePresets) do
     c.CornerRadius = UDim.new(0, 6)
     c.Parent = b
     
-    -- Color preview dot
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, 14, 0, 14)
     dot.Position = UDim2.new(1, -24, 0.5, -7)
@@ -1106,19 +1158,21 @@ end
 -- =====================================================================
 local FloatingWidget = Instance.new("TextButton")
 FloatingWidget.Name = "FloatingMiniToggle"
-FloatingWidget.Size = UDim2.new(0, 48, 0, 48)
-FloatingWidget.Position = UDim2.new(0, 18, 0.5, -24)
+FloatingWidget.Size = UDim2.new(0, 44, 0, 44)
+FloatingWidget.Position = UDim2.new(0, 14, 0.35, 0) -- Safely positioned above mobile joystick
 FloatingWidget.BackgroundColor3 = Config.ThemeColor
 FloatingWidget.Text = "🗡️"
-FloatingWidget.TextSize = 22
+FloatingWidget.TextSize = 20
 FloatingWidget.Visible = true
 FloatingWidget.Parent = ScreenGui
+
 local FloatCorner = Instance.new("UICorner")
 FloatCorner.CornerRadius = UDim.new(1, 0)
 FloatCorner.Parent = FloatingWidget
+
 local FloatStroke = Instance.new("UIStroke")
 FloatStroke.Color = Color3.fromRGB(255, 255, 255)
-FloatStroke.Thickness = 2
+FloatStroke.Thickness = 1.5
 FloatStroke.Parent = FloatingWidget
 
 -- Floating widget click toggles UI
@@ -1136,7 +1190,6 @@ end)
 CloseButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     FloatingWidget.Visible = true
-    print("[Blox Fruits Hub]: Minimized to floating button. Press " .. tostring(Config.Keybind) .. " to reopen anytime.")
 end)
 
 -- Keybind Toggle Listener
@@ -1146,4 +1199,18 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[Blox Fruits V3 Suite]: Loaded successfully! Click floating 🗡️ or press RightControl to toggle menu.")
+-- =====================================================================
+-- START EXECUTION IMMEDIATELY
+-- =====================================================================
+StartMasterLoop()
+
+-- Native In-game Toast Notification
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Blox Fruits V3 Suite",
+        Text = "Script Loaded! Press [RightCtrl] or tap 🗡️",
+        Duration = 6
+    })
+end)
+
+print("[Blox Fruits V3 Suite]: Loaded successfully! Tap floating 🗡️ or press RightControl to toggle menu.")
