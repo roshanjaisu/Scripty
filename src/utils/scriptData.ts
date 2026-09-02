@@ -1,4 +1,4 @@
-export const SCRIPT_RAW_URL = 'https://raw.githubusercontent.com/roshanjaisu/Scripty/refs/heads/main/main';
+export const SCRIPT_RAW_URL = 'https://raw.githubusercontent.com/roshanjaisu/Scripty/refs/heads/main/main.lua';
 
 export const SCRIPT_CODE = `--[[
     ================================================================================

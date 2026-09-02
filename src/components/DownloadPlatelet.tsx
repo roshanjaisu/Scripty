@@ -97,7 +97,7 @@ export const DownloadPlatelet: React.FC<DownloadPlateletProps> = ({ onNotify }) 
 
           <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2 text-xs">
             <span className="text-zinc-400 truncate font-mono text-[11px]">
-              roshanjaisu/Scripty/main
+              roshanjaisu/Scripty/main.lua
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
               <button

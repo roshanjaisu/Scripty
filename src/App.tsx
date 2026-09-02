@@ -113,7 +113,7 @@ export default function App() {
             <span className="font-medium">100% Client-Side Luau • CanCollide Safe • No Account Access Needed</span>
           </div>
           <div className="text-[11px] text-zinc-500 font-mono">
-            Direct Endpoint: <code className="text-zinc-400">roshanjaisu/Scripty/main</code>
+            Direct Endpoint: <code className="text-zinc-400">roshanjaisu/Scripty/main.lua</code>
           </div>
         </div>
       </main>
