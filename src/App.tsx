@@ -17,13 +17,18 @@ import {
   Magnet,
   Crosshair,
   Palette,
+  Zap,
 } from 'lucide-react';
 
 export default function App() {
   const [config, setConfig] = useState<ScriptConfig>(DEFAULT_CONFIG);
   const [hitboxEnabled, setHitboxEnabled] = useState<boolean>(true);
   const [activeViewTab, setActiveViewTab] = useState<'simulator' | 'code' | 'settings'>('simulator');
-  const [copiedToast, setCopiedToast] = useState<boolean>(false);
+  const [copiedToast, setCopiedToast] = useState<string | null>(null);
+
+  // User's repository target link (Pure Luau file in root)
+  const defaultRawUrl = 'https://raw.githubusercontent.com/roshanjaisu/Scripty/main/main.lua';
+  const standardLoadstring = `loadstring(game:HttpGet("${defaultRawUrl}"))()`;
 
   // Derive selected color object
   const selectedTheme = useMemo(() => {
@@ -54,8 +59,8 @@ export default function App() {
   const handleQuickCopy = async () => {
     try {
       await navigator.clipboard.writeText(generatedScript);
-      setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 2000);
+      setCopiedToast('Full Luau Script Copied to Clipboard!');
+      setTimeout(() => setCopiedToast(null), 2200);
     } catch {
       const textarea = document.createElement('textarea');
       textarea.value = generatedScript;
@@ -63,8 +68,25 @@ export default function App() {
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 2000);
+      setCopiedToast('Full Luau Script Copied to Clipboard!');
+      setTimeout(() => setCopiedToast(null), 2200);
+    }
+  };
+
+  const handleCopyLoadstring = async () => {
+    try {
+      await navigator.clipboard.writeText(standardLoadstring);
+      setCopiedToast('1-Line Loadstring Copied! Ready to execute');
+      setTimeout(() => setCopiedToast(null), 2200);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = standardLoadstring;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedToast('1-Line Loadstring Copied! Ready to execute');
+      setTimeout(() => setCopiedToast(null), 2200);
     }
   };
 
@@ -72,9 +94,9 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-slate-950">
       {/* Toast Notification */}
       {copiedToast && (
-        <div className="fixed top-5 right-5 z-50 bg-emerald-500 text-slate-950 px-4 py-2.5 rounded-xl font-bold shadow-2xl flex items-center gap-2 border border-emerald-300 animate-in fade-in slide-in-from-top-3 duration-200">
+        <div className="fixed top-5 right-5 z-50 bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl font-bold shadow-2xl flex items-center gap-2 border border-amber-300 animate-in fade-in slide-in-from-top-3 duration-200">
           <Check size={18} className="stroke-[3]" />
-          <span>Luau Script Copied to Clipboard!</span>
+          <span>{copiedToast}</span>
         </div>
       )}
 
@@ -109,7 +131,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Hitbox Expander &bull; Auto M1 Clicker &bull; Mob Magnet &bull; 3D ESP &bull; ScreenGui
+                Hitbox Expander &bull; Auto M1 Clicker &bull; Mob Magnet &bull; 3D ESP &bull; 1-Line Loadstring
               </p>
             </div>
           </div>
@@ -144,17 +166,24 @@ export default function App() {
               ))}
             </div>
 
-            {/* Copy Script Button */}
+            {/* Copy Loadstring Hub Button */}
+            <button
+              onClick={handleCopyLoadstring}
+              className="px-3.5 py-2 rounded-lg font-black text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95 bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-amber-500/20"
+              title="Copy 1-line loadstring for Roblox executors"
+            >
+              <Zap size={14} className="fill-slate-950" />
+              <span>Copy Loadstring</span>
+            </button>
+
+            {/* Copy Full Script Button */}
             <button
               onClick={handleQuickCopy}
-              className="px-3.5 py-2 rounded-lg font-black text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95 text-slate-950"
-              style={{
-                backgroundColor: selectedTheme.hex,
-                boxShadow: `0 0 15px ${selectedTheme.hex}44`,
-              }}
+              className="px-3.5 py-2 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+              title="Copy full uncompiled Luau code"
             >
               <Copy size={14} />
-              <span>Copy Script</span>
+              <span className="hidden sm:inline">Full Code</span>
             </button>
           </div>
         </div>
@@ -169,29 +198,29 @@ export default function App() {
               onClick={() => setActiveViewTab('simulator')}
               className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
                 activeViewTab === 'simulator'
-                  ? 'bg-cyan-500 text-slate-950 shadow'
+                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <PlayCircle size={15} />
-              <span>Interactive 3D Simulator & ScreenGui</span>
+              <span>Interactive 3D Simulator</span>
             </button>
             <button
               onClick={() => setActiveViewTab('code')}
               className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
                 activeViewTab === 'code'
-                  ? 'bg-cyan-500 text-slate-950 shadow'
+                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Terminal size={15} />
-              <span>Generated Luau Script</span>
+              <span>Loadstring Hub & Code</span>
             </button>
             <button
               onClick={() => setActiveViewTab('settings')}
               className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${
                 activeViewTab === 'settings'
-                  ? 'bg-cyan-500 text-slate-950 shadow'
+                  ? 'bg-cyan-500 text-slate-950 shadow font-bold'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -236,7 +265,7 @@ export default function App() {
             {/* Quick Summary & Code Preview Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <ScriptViewer scriptCode={generatedScript} />
+                <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
               </div>
               <div className="lg:col-span-1">
                 <ConfigPanel
@@ -252,7 +281,7 @@ export default function App() {
 
         {activeViewTab === 'code' && (
           <div className="space-y-6">
-            <ScriptViewer scriptCode={generatedScript} />
+            <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
             <ConfigPanel
               config={config}
               onChange={handleConfigChange}
@@ -273,7 +302,7 @@ export default function App() {
               />
             </div>
             <div className="lg:col-span-1">
-              <ScriptViewer scriptCode={generatedScript} />
+              <ScriptViewer scriptCode={generatedScript} defaultRawUrl={defaultRawUrl} />
             </div>
           </div>
         )}
