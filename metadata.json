@@ -1,6 +1,6 @@
 {
   "name": "Blox Fruits Hitbox Script & UI Studio",
-  "description": "Material 3 and liquid glass script portal for Blox Fruits with instant 1-click copy loadstring, source code viewer, and direct file download.",
+  "description": "Code studio and Luau script viewer for Blox Fruits ChestHub Auto-Farm, Config Manager, and automation tools.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

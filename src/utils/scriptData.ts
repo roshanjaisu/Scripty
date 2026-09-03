@@ -1,477 +1,688 @@
 export const SCRIPT_RAW_URL = 'https://raw.githubusercontent.com/roshanjaisu/Scripty/refs/heads/main/main.lua';
 
-export const SCRIPT_CODE = `--[[
-    ================================================================================
-    BLOX FRUITS - ADVANCED HITBOX EXPANDER & SILENT AIM PVP SUITE
-    ================================================================================
-    Target Game: Blox Fruits (Sea 1, Sea 2, Sea 3)
-    Features:
-      • Dynamic Hitbox Expander (HumanoidRootPart / Torso)
-      • Physics-Safe (CanCollide = false, Massless = true to prevent flings)
-      • Smart Target Filtering (Players, Enemies, Bosses)
-      • Visual Target ESP & Lock Reticle
-      • Silent Aim Camera / Mouse Assist with FOV Circle
-      • Draggable Mobile & PC In-Game HUD (Toggle Key: Right Control)
-      • Clean Reset Engine (Restores default sizes on exit)
-    ================================================================================
-]]--
+export const SCRIPT_CODE = `-- // NAHSOR CONFIG MANAGER V9 [PERFECTED LAYOUT] //
+-- [Features: Right-Side Inputs | Grouped Order | Sleek UI]
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local Http = game:GetService("HttpService")
+local Input = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
-local CoreGui = game:GetService("CoreGui")
+local LP = Players.LocalPlayer
+local FileName = "NahsorConfig.json"
 
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local Camera = workspace.CurrentCamera
-
--- Global Suite Configuration State
-local SuiteConfig = {
-    HitboxEnabled = true,
-    HitboxSize = 25,
-    HitboxTransparency = 0.55,
-    HitboxColor = Color3.fromRGB(0, 220, 255), -- Neon Cyan
-    TargetMode = "Players", -- "Players", "Enemies", "All"
-    SilentAimEnabled = true,
-    SilentAimFOV = 180,
-    VisualESP = true,
-    Keybind = Enum.KeyCode.RightControl
+-- [1] DEFAULT CONFIG
+local Config = {
+    Disable3DRender = true, AFKMode = true, FastMode = true, UltraFastMode = false,
+    FarmChests = true, StopOnRareItem = true,
+    MaxTime = 120, TweenSpeed = 350, MaxFarmDistance = 4000, HopDelay = 8,
+    FPSLimit = 60
 }
 
--- Registry to restore parts cleanly
-local OriginalPartsRegistry = {}
+-- [2] SAVE/LOAD
+local function Save() pcall(function() writefile(FileName, Http:JSONEncode(Config)) end) end
+if isfile(FileName) then pcall(function() local d = Http:JSONDecode(readfile(FileName)) for k,v in pairs(d) do Config[k]=v end end) end
 
--- Safe GUI Parent Detection
-local function getSafeGuiParent()
-    local parent = nil
-    if type(gethui) == "function" then
-        pcall(function() parent = gethui() end)
-    end
-    if not parent then
-        pcall(function() parent = CoreGui end)
-    end
-    if not parent then
-        parent = LocalPlayer:WaitForChild("PlayerGui")
-    end
-    return parent
+-- [3] UI SETUP
+local GuiName = "NahsorConfig_V9"
+pcall(function() if LP.PlayerGui:FindFirstChild(GuiName) then LP.PlayerGui[GuiName]:Destroy() end end)
+local Gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui")); Gui.Name = GuiName
+
+local function Create(cls, props) local inst = Instance.new(cls); for k,v in pairs(props) do inst[k] = v end; return inst end
+local function Tween(obj, props, time, style, dir)
+    TweenService:Create(obj, TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
 end
 
-local GuiParent = getSafeGuiParent()
+-- [4] FLOATING BUTTON
+local OpenBtn = Create("TextButton", {
+    Parent=Gui, Size=UDim2.new(0,40,0,40), Position=UDim2.new(0.05,0,0.4,0),
+    BackgroundColor3=Color3.fromRGB(18,18,18), Text="⚙", TextSize=22,
+    TextColor3=Color3.fromRGB(240,240,240), AutoButtonColor=false, Font=Enum.Font.GothamBold
+})
+Create("UICorner", {Parent=OpenBtn, CornerRadius=UDim.new(0,10)})
+Create("UIStroke", {Parent=OpenBtn, Color=Color3.fromRGB(60,60,60), Thickness=1.5})
 
--- Clean up any existing instances
-local existingGui = GuiParent:FindFirstChild("BF_PvPSuite_Gui")
-if existingGui then
-    pcall(function() existingGui:Destroy() end)
-end
-
--- Notify Executor User
-pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "⚔️ PvP Suite Loaded",
-        Text = "Hitbox Expander & Silent Aim are active! Press [Right Ctrl] to toggle UI.",
-        Duration = 6
-    })
+-- Drag Logic
+local drag, startPos
+OpenBtn.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
+        drag=i.Position; startPos=OpenBtn.Position
+        Tween(OpenBtn, {BackgroundColor3=Color3.fromRGB(40,40,40)}, 0.2)
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then drag=nil; Tween(OpenBtn, {BackgroundColor3=Color3.fromRGB(18,18,18)}, 0.2) end end)
+    end
+end)
+Input.InputChanged:Connect(function(i)
+    if (i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMovement) and drag then
+        local d=i.Position-drag; local t = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
+        TweenService:Create(OpenBtn, TweenInfo.new(0.05, Enum.EasingStyle.Linear), {Position=t}):Play()
+    end
 end)
 
---------------------------------------------------------------------------------
--- TARGET DETECTION HELPERS
---------------------------------------------------------------------------------
-local function isAlive(character)
-    if not character then return false end
-    local hum = character:FindFirstChildOfClass("Humanoid")
-    return hum and hum.Health > 0
-end
+-- [5] MAIN MENU
+local Main = Create("Frame", {
+    Parent=Gui, Visible=false, Size=UDim2.new(0,280,0,380),
+    Position=UDim2.new(0.5,0,0.5,0), AnchorPoint=Vector2.new(0.5,0.5),
+    BackgroundColor3=Color3.fromRGB(12,12,12), BackgroundTransparency=0, ClipsDescendants=true
+})
+Create("UICorner", {Parent=Main, CornerRadius=UDim.new(0,10)})
+Create("UIStroke", {Parent=Main, Color=Color3.fromRGB(40,40,40), Thickness=1})
 
-local function getTargetTeam(character)
-    local player = Players:GetPlayerFromCharacter(character)
-    if player then
-        return tostring(player.Team)
-    end
-    return "NPC"
-end
+-- Header
+local Header = Create("Frame", {Parent=Main, Size=UDim2.new(1,0,0,40), BackgroundColor3=Color3.fromRGB(18,18,18), BorderSizePixel=0})
+Create("TextLabel", {
+    Parent=Header, Size=UDim2.new(1,-15,1,0), Position=UDim2.new(0,15,0,0), BackgroundTransparency=1,
+    Text="NAHSOR CONFIG", TextColor3=Color3.fromRGB(255,255,255), TextSize=13, Font=Enum.Font.GothamBold, TextXAlignment=Enum.TextXAlignment.Left
+})
+Create("Frame", {Parent=Header, Size=UDim2.new(1,0,0,1), Position=UDim2.new(0,0,1,-1), BackgroundColor3=Color3.fromRGB(0,255,200), BorderSizePixel=0})
 
-local function shouldTarget(character)
-    if not character or character == LocalPlayer.Character then
-        return false
-    end
-    if not isAlive(character) then
-        return false
-    end
+-- Footer
+local Footer = Create("Frame", {
+    Parent=Main, Size=UDim2.new(1,0,0,45), Position=UDim2.new(0,0,1,-45),
+    BackgroundColor3=Color3.fromRGB(18,18,18), BorderSizePixel=0
+})
+Create("Frame", {Parent=Footer, Size=UDim2.new(1,0,0,1), BackgroundColor3=Color3.fromRGB(35,35,35), BorderSizePixel=0})
+local DescLbl = Create("TextLabel", {
+    Parent=Footer, Size=UDim2.new(1,-20,1,-4), Position=UDim2.new(0,10,0,4),
+    BackgroundTransparency=1, Text="Tap [?] to see what a setting does.",
+    TextColor3=Color3.fromRGB(120,120,120), TextSize=11, Font=Enum.Font.Gotham, 
+    TextWrapped=true, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top
+})
 
-    local player = Players:GetPlayerFromCharacter(character)
-    if SuiteConfig.TargetMode == "Players" then
-        return player ~= nil
-    elseif SuiteConfig.TargetMode == "Enemies" then
-        if player then
-            -- Check if same team (Marines vs Pirates)
-            if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
-                return false
+-- Scroll
+local Scroll = Create("ScrollingFrame", {
+    Parent=Main, Size=UDim2.new(1,0,1,-85), Position=UDim2.new(0,0,0,40),
+    BackgroundTransparency=1, ScrollBarThickness=2, CanvasSize=UDim2.new(0,0,0,0), ScrollBarImageColor3=Color3.fromRGB(80,80,80)
+})
+local List = Create("UIListLayout", {Parent=Scroll, Padding=UDim.new(0,0), SortOrder=Enum.SortOrder.LayoutOrder})
+List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() Scroll.CanvasSize = UDim2.new(0,0,0,List.AbsoluteContentSize.Y) end)
+
+-- [6] OPTION GENERATOR
+local function AddOption(name, key, type, info)
+    local Row = Create("Frame", {Parent=Scroll, Size=UDim2.new(1,0,0,40), BackgroundTransparency=1})
+    Create("Frame", {Parent=Row, Size=UDim2.new(1,-20,0,1), Position=UDim2.new(0,10,1,-1), BackgroundColor3=Color3.fromRGB(25,25,25), BorderSizePixel=0})
+    
+    -- Label
+    Create("TextLabel", {
+        Parent=Row, Size=UDim2.new(0.6,0,1,0), Position=UDim2.new(0,15,0,0), BackgroundTransparency=1,
+        Text=name, TextColor3=Color3.fromRGB(200,200,200), TextSize=12, Font=Enum.Font.GothamMedium, TextXAlignment=Enum.TextXAlignment.Left
+    })
+    
+    -- [?] Info Button (Positioned exactly right of the Text)
+    local InfoBtn = Create("TextButton", {
+        Parent=Row, Size=UDim2.new(0,20,0,20), Position=UDim2.new(0,140,0.5,-10),
+        BackgroundTransparency=1, Text="?", TextColor3=Color3.fromRGB(80,80,80), TextSize=12, Font=Enum.Font.GothamBold
+    })
+    InfoBtn.MouseButton1Click:Connect(function() DescLbl.Text = info; Tween(DescLbl, {TextColor3=Color3.fromRGB(255,255,255)}, 0.2); task.wait(0.3); Tween(DescLbl, {TextColor3=Color3.fromRGB(120,120,120)}, 0.5) end)
+
+    if type == "Bool" then
+        local ToggleBg = Create("TextButton", {
+            Parent=Row, Size=UDim2.new(0,36,0,18), Position=UDim2.new(1,-50,0.5,-9),
+            AutoButtonColor=false, Text="", BackgroundColor3=Color3.fromRGB(40,40,40)
+        })
+        Create("UICorner", {Parent=ToggleBg, CornerRadius=UDim.new(1,0)})
+        local Circle = Create("Frame", {
+            Parent=ToggleBg, Size=UDim2.new(0,14,0,14), Position=UDim2.new(0,2,0.5,-7),
+            BackgroundColor3=Color3.fromRGB(255,255,255)
+        })
+        Create("UICorner", {Parent=Circle, CornerRadius=UDim.new(1,0)})
+        
+        local function Update()
+            local on = Config[key]
+            if on then
+                Tween(ToggleBg, {BackgroundColor3=Color3.fromRGB(0,255,200)}, 0.2)
+                Tween(Circle, {Position=UDim2.new(1,-16,0.5,-7)}, 0.2, Enum.EasingStyle.Back)
+            else
+                Tween(ToggleBg, {BackgroundColor3=Color3.fromRGB(40,40,40)}, 0.2)
+                Tween(Circle, {Position=UDim2.new(0,2,0.5,-7)}, 0.2, Enum.EasingStyle.Back)
             end
-            return true
-        else
-            -- Check if hostile NPC / Boss
-            return true
         end
-    elseif SuiteConfig.TargetMode == "All" then
-        return true
+        ToggleBg.MouseButton1Click:Connect(function() Config[key] = not Config[key]; Update(); Save() end); Update()
+        
+    else
+        -- [RIGHT SIDE INPUT] (Restored V6 Layout)
+        local Box = Create("TextBox", {
+            Parent=Row, Size=UDim2.new(0,50,0,24), Position=UDim2.new(1,-65,0.5,-12),
+            BackgroundColor3=Color3.fromRGB(20,20,20), TextColor3=Color3.fromRGB(0,255,200),
+            Text=tostring(Config[key]), Font=Enum.Font.GothamBold, TextSize=12
+        })
+        Create("UICorner", {Parent=Box, CornerRadius=UDim.new(0,4)})
+        Create("UIStroke", {Parent=Box, Color=Color3.fromRGB(50,50,50), Thickness=1})
+        
+        Box.FocusLost:Connect(function() 
+            local n = tonumber(Box.Text)
+            if n then Config[key]=n; Save(); if key == "FPSLimit" and setfpscap then setfpscap(n) end else Box.Text=tostring(Config[key]) end 
+        end)
+    end
+end
+
+-- [7] MENU ITEMS (Grouped: Toggles Top, Numbers Bottom)
+AddOption("Farm Chests", "FarmChests", "Bool", "Auto-collects treasure chests.")
+AddOption("3D Saver", "Disable3DRender", "Bool", "Turns screen black to save battery.")
+AddOption("AFK Overlay", "AFKMode", "Bool", "Black overlay to prevent burn-in.")
+AddOption("Fast Mode", "FastMode", "Bool", "Reduces texture quality.")
+AddOption("Ultra Fast", "UltraFastMode", "Bool", "Deletes map (Void Mode).")
+AddOption("Stop on Rare", "StopOnRareItem", "Bool", "Stops hopping if God's Chalice found.")
+
+-- Numbers Section (Inputs)
+AddOption("Time Limit", "MaxTime", "Num", "Force hop after X seconds.")
+AddOption("Tween Speed", "TweenSpeed", "Num", "Flight Speed (Higher = Slower).")
+AddOption("Max Dist", "MaxFarmDistance", "Num", "Scan range for chests.")
+AddOption("Hop Delay", "HopDelay", "Num", "Seconds wait before hop.")
+AddOption("FPS Limit", "FPSLimit", "Num", "Locks FPS (e.g. 15, 30, 60).")
+
+-- [8] ANIMATION
+local isOpen = false
+Main.Size = UDim2.new(0,260,0,380) 
+OpenBtn.MouseButton1Click:Connect(function()
+    isOpen = not isOpen
+    if isOpen then
+        Main.Visible = true; Main.Size = UDim2.new(0,260,0,380); Main.BackgroundTransparency = 1
+        Tween(Main, {Size=UDim2.new(0,280,0,400), BackgroundTransparency=0}, 0.35, Enum.EasingStyle.Back)
+        for _,v in pairs(Main:GetDescendants()) do if v:IsA("TextLabel") or v:IsA("TextBox") then v.TextTransparency=1; Tween(v, {TextTransparency=0}, 0.2) end end
+    else
+        Tween(Main, {Size=UDim2.new(0,260,0,380), BackgroundTransparency=1}, 0.2)
+        for _,v in pairs(Main:GetDescendants()) do if v:IsA("TextLabel") or v:IsA("TextBox") then Tween(v, {TextTransparency=1}, 0.1) end end
+        task.wait(0.2); Main.Visible = false
+    end
+end)
+
+
+-- // NAHSOR CHESTHUB V14.9 - CHUNK 1 [FIXED SETUP] //
+-- [Status: WORKING | Config & Stats Loaded | Typos Fixed]
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+
+local game = game
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+local task_wait, task_spawn = task.wait, task.spawn
+local math_floor, math_huge = math.floor, math.huge
+local os_time, os_date = os.time, os.date
+
+-- ==================================================================
+-- [1] CONFIGURATION
+-- ==================================================================
+local Config = {
+    WebhookURL = "https://discord.com/api/webhooks/1462804066781364359/Xh5J3nE6FyQ1g3y4abuX6YZYfTzrBS5gW1SxEqytxqybE-jokz0uPlMgfa5NVM8Ej22t",
+    
+    TweenSpeed = 350,       
+    CollectionWait = 0.05, 
+    MaxTime = 120,
+    Disable3DRender = true, 
+    AFKMode = true,
+    FastMode = true,        
+    UltraFastMode = false,
+    StopOnRareItem = true,
+    AdminHop = true, 
+    FarmChests = true,
+    FarmFruit = true,
+    HopDelay = 8,
+    MaxFarmDistance = 4000
+}
+
+-- Load Config File
+local FileName = "NahsorConfig.json"
+if isfile(FileName) then
+    pcall(function()
+        local FileData = readfile(FileName)
+        local UserSettings = HttpService:JSONDecode(FileData)
+        for Key, Value in pairs(UserSettings) do
+            if Config[Key] ~= nil then Config[Key] = Value end
+        end
+        print("[NahsorConfig] Settings Loaded!")
+    end)
+end
+
+-- Legacy Support
+pcall(function()
+    if getgenv and getgenv().UserConfig then
+        for k, v in pairs(getgenv().UserConfig) do Config[k] = v end
+    end
+end)
+
+-- SHARE GLOBALLY (Vital for Chunk 2)
+getgenv().Config = Config 
+
+-- ==================================================================
+-- [2] SHARED STATS
+-- ==================================================================
+getgenv().Stats = { Chests = 0, StartMoney = 0, StartTime = os_time() }
+pcall(function() getgenv().Stats.StartMoney = LP.Data.Beli.Value end)
+
+-- Global Dragger
+getgenv().MakeDraggable = function(gui)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
+end
+
+-- ==================================================================
+-- [3] SETUP HELPERS
+-- ==================================================================
+
+-- Anti-AFK
+LP.Idled:Connect(function()
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0,0))
+    end)
+end)
+
+-- Auto Team
+task_spawn(function()
+    repeat task_wait() until ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+    local attempts = 0
+    while attempts < 60 do 
+        if LP.Team and LP.Team.Name == "Pirates" then break end
+        pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates") end)
+        attempts = attempts + 1
+        task_wait(1)
+    end
+end)
+
+-- Fast Mode
+local function ApplyFastMode()
+    if Config.UltraFastMode then return end
+    if not Config.FastMode then return end
+    local L = game:GetService("Lighting")
+    L.GlobalShadows, L.FogEnd = false, 9e9
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    local function Fastify(v)
+        if v:IsA("BasePart") then pcall(function() v.Material, v.CastShadow = Enum.Material.SmoothPlastic, false end) end
+        if v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1 end
+    end
+    for _,v in pairs(workspace:GetDescendants()) do Fastify(v) end
+    workspace.DescendantAdded:Connect(Fastify)
+end
+
+-- Ultra Fast Mode (Fixed Typo)
+local function ApplyUltraFastMode()
+    if not Config.UltraFastMode then return end
+    pcall(function()
+        local L = game:GetService("Lighting")
+        L.GlobalShadows = false
+        L.FogEnd = 9e9
+        L.Brightness = 0.4
+        L.Ambient = Color3.new(0,0,0)
+        L.OutdoorAmbient = Color3.new(0,0,0)
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        for _,v in pairs(L:GetChildren()) do if v:IsA("PostEffect") or v:IsA("Sky") then v:Destroy() end end
+        local function Clear(v)
+            if v:IsA("BasePart") then v.Material, v.CastShadow = Enum.Material.SmoothPlastic, false
+            elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1
+            elseif v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") then v:Destroy()
+            elseif v:IsA("PointLight") or v:IsA("SurfaceLight") or v:IsA("SpotLight") then v:Destroy() end
+        end
+        for _,v in pairs(workspace:GetDescendants()) do Clear(v) end
+        workspace.DescendantAdded:Connect(Clear) -- [FIXED TYPO HERE]
+    end)
+end
+
+task_spawn(function()
+    task_wait(1)
+    if Config.UltraFastMode then ApplyUltraFastMode()
+    elseif Config.FastMode then ApplyFastMode() end
+end)
+
+
+-- // NAHSOR CHESTHUB V14.9 - CHUNK 2 [COMPLETE ENGINE] //
+-- [Includes: Webhook, UI, Buttons, Farming Logic]
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
+local Workspace = game:GetService("Workspace")
+
+local task_wait, task_spawn = task.wait, task.spawn
+local math_floor, math_huge = math.floor, math.huge
+local os_time = os.time
+
+-- ==================================================================
+-- [1] WEBHOOK SYSTEM (Universal)
+-- ==================================================================
+local function SendWebhook(msg)
+    if not getgenv().Config.WebhookURL or getgenv().Config.WebhookURL == "" then return end
+    
+    task_spawn(function()
+        local request = http_request or request or HttpPost or syn.request
+        if not request then return end
+        
+        local currentBeli = 0
+        pcall(function() currentBeli = LP.Data.Beli.Value end)
+        
+        local stats = getgenv().Stats or {StartTime = os_time(), StartMoney = currentBeli, Chests = 0}
+        local duration = os_time() - (stats.StartTime or os.time())
+        local timeString = string.format("%02d:%02d:%02d", math_floor(duration/3600), math_floor((duration%3600)/60), duration%60)
+        local earned = currentBeli - (stats.StartMoney or 0)
+        
+        local isAlert = (msg and msg ~= "" and msg ~= "Start")
+        local isStart = (msg == "Start")
+        
+        local Title = "💰 SERVER REPORT"
+        local Color = 65280 -- Green
+        
+        if isAlert then
+            Title = "🚨 RARE ITEM FOUND!"
+            Color = 16711680 -- Red
+        elseif isStart then
+            Title = "🟢 SCRIPT STARTED"
+            Color = 65535 -- Cyan
+        end
+
+        local Embed = {
+            ["title"] = Title,
+            ["description"] = "**Player:** " .. LP.Name .. 
+                              "\n**Time:** " .. timeString .. 
+                              "\n**Chests:** " .. tostring(stats.Chests or 0) .. 
+                              "\n**Money:** $" .. tostring(earned) .. 
+                              "\n**Status:** " .. (isStart and "Running" or (msg or "Farming")),
+            ["color"] = Color,
+            ["footer"] = { ["text"] = "Nahsor ChestHub V14.9" }
+        }
+        
+        pcall(function() 
+            request({
+                Url = getgenv().Config.WebhookURL, 
+                Body = HttpService:JSONEncode({["embeds"] = {Embed}}), 
+                Method = "POST", 
+                Headers = {["Content-Type"] = "application/json"}
+            }) 
+        end)
+    end)
+end
+getgenv().SendWebhook = SendWebhook
+
+-- ==================================================================
+-- [2] UI CONSTRUCTION
+-- ==================================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ChestHub_Core"
+ScreenGui.IgnoreGuiInset = true 
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling 
+pcall(function() if LP.PlayerGui:FindFirstChild("ChestHub_Core") then LP.PlayerGui.ChestHub_Core:Destroy() end ScreenGui.Parent = LP.PlayerGui end)
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Position = UDim2.new(0.02, 0, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 180, 0, 0)
+MainFrame.AutomaticSize = Enum.AutomaticSize.Y
+MainFrame.ZIndex = 10 
+if getgenv().MakeDraggable then getgenv().MakeDraggable(MainFrame) end
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Color = Color3.fromRGB(40, 225, 80)
+Stroke.Thickness = 1.5
+
+local UIList = Instance.new("UIListLayout", MainFrame)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 4)
+local Padding = Instance.new("UIPadding", MainFrame)
+Padding.PaddingTop = UDim.new(0, 10); Padding.PaddingLeft = UDim.new(0, 10); Padding.PaddingRight = UDim.new(0, 10); Padding.PaddingBottom = UDim.new(0, 10)
+
+local function Label(text, color, order)
+    local l = Instance.new("TextLabel", MainFrame)
+    l.Text, l.TextColor3, l.LayoutOrder = text, color or Color3.fromRGB(220, 220, 220), order
+    l.BackgroundTransparency, l.Size, l.Font, l.TextSize = 1, UDim2.new(1,0,0,16), Enum.Font.GothamBold, 12
+    l.TextXAlignment, l.ZIndex = Enum.TextXAlignment.Left, 11
+    return l
+end
+
+TitleLbl = Label("NAHSOR CHESTHUB", Color3.fromRGB(255, 60, 60), 0)
+ChestsLbl = Label("Chests: 0", Color3.fromRGB(255, 170, 0), 1)
+FruitLbl = Label("Fruit: None", Color3.fromRGB(255, 85, 255), 2)
+TimerLbl = Label("Time: 00:00:00", Color3.fromRGB(180, 180, 180), 3)
+EarnedLbl = Label("Money: $0", Color3.fromRGB(85, 255, 127), 4)
+StatusLbl = Label("Status: Starting...", Color3.fromRGB(255, 255, 255), 5)
+
+-- Buttons
+local Divider = Instance.new("Frame", MainFrame)
+Divider.BackgroundColor3, Divider.BorderSizePixel, Divider.Size, Divider.LayoutOrder = Color3.fromRGB(60, 60, 60), 0, UDim2.new(1, 0, 0, 1), 6
+
+local BtnRow = Instance.new("Frame", MainFrame)
+BtnRow.BackgroundTransparency, BtnRow.Size, BtnRow.LayoutOrder = 1, UDim2.new(1, 0, 0, 24), 7
+local ToggleBtn = Instance.new("TextButton", BtnRow)
+ToggleBtn.Text, ToggleBtn.BackgroundColor3, ToggleBtn.Size = "ON", Color3.fromRGB(40, 180, 40), UDim2.new(0.48, 0, 1, 0)
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+local HopBtn = Instance.new("TextButton", BtnRow)
+HopBtn.Text, HopBtn.BackgroundColor3, HopBtn.Size, HopBtn.Position = "HOP", Color3.fromRGB(40, 100, 220), UDim2.new(0.48, 0, 1, 0), UDim2.new(0.52, 0, 0, 0)
+Instance.new("UICorner", HopBtn).CornerRadius = UDim.new(0, 6)
+
+-- Extra Row (AFK & Render)
+local ExtraRow = Instance.new("Frame", MainFrame)
+ExtraRow.BackgroundTransparency, ExtraRow.Size, ExtraRow.LayoutOrder = 1, UDim2.new(1, 0, 0, 24), 8
+local AFKBtn = Instance.new("TextButton", ExtraRow)
+AFKBtn.Text, AFKBtn.BackgroundColor3, AFKBtn.Size = "AFK", Color3.fromRGB(40, 180, 40), UDim2.new(0.48, 0, 1, 0)
+Instance.new("UICorner", AFKBtn).CornerRadius = UDim.new(0, 6)
+local RenderBtn = Instance.new("TextButton", ExtraRow)
+RenderBtn.Text, RenderBtn.BackgroundColor3, RenderBtn.Size, RenderBtn.Position = "3d Rend: ON", Color3.fromRGB(40, 180, 40), UDim2.new(0.48, 0, 1, 0), UDim2.new(0.52, 0, 0, 0)
+Instance.new("UICorner", RenderBtn).CornerRadius = UDim.new(0, 6)
+
+local BlurFrame = Instance.new("Frame", ScreenGui)
+BlurFrame.Name, BlurFrame.Size, BlurFrame.BackgroundColor3, BlurFrame.Visible = "AFKOverlay", UDim2.new(1,0,1,0), Color3.fromRGB(0,0,0), Config.AFKMode
+
+-- ==================================================================
+-- [3] LOGIC & HOPPING
+-- ==================================================================
+local ChestCache, VisitedChests, CollectedPositions, CollectedFruits = {}, {}, {}, {}
+local Farming, IsMoving, Hopping = true, false, false
+local LastMoveTime, LastPos, LastCacheRefresh = os_time(), Vector3.new(0,0,0), 0
+local RareItems = {"God's Chalice", "Fist of Darkness"}
+
+local function CheckRareItems()
+    if not LP or not LP.Character or not LP:FindFirstChild("Backpack") then return false end
+    for _, item in pairs(RareItems) do
+        if LP.Backpack:FindFirstChild(item) or LP.Character:FindFirstChild(item) then return true end
     end
     return false
 end
 
---------------------------------------------------------------------------------
--- HITBOX EXPANDER ENGINE
---------------------------------------------------------------------------------
-local function expandHitbox(character)
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root or not root:IsA("BasePart") then return end
-
-    if not OriginalPartsRegistry[root] then
-        OriginalPartsRegistry[root] = {
-            Size = root.Size,
-            Transparency = root.Transparency,
-            CanCollide = root.CanCollide,
-            Material = root.Material,
-            Color = root.Color
-        }
-    end
-
-    if SuiteConfig.HitboxEnabled and shouldTarget(character) then
-        root.Size = Vector3.new(SuiteConfig.HitboxSize, SuiteConfig.HitboxSize, SuiteConfig.HitboxSize)
-        root.Transparency = SuiteConfig.HitboxTransparency
-        root.Color = SuiteConfig.HitboxColor
-        root.Material = Enum.Material.Neon
-        root.CanCollide = false
-        root.Massless = true
-    else
-        -- Restore original
-        local orig = OriginalPartsRegistry[root]
-        if orig then
-            root.Size = orig.Size
-            root.Transparency = orig.Transparency
-            root.Color = orig.Color
-            root.Material = orig.Material
-            root.CanCollide = orig.CanCollide
-        end
-    end
+local function BlindHop()
+    StatusLbl.Text = "API Bad. Blind Hopping..."
+    StatusLbl.TextColor3 = Color3.fromRGB(255, 0, 0)
+    if getgenv().Config.Disable3DRender then pcall(function() RunService:Set3dRenderingEnabled(false) end) end
+    TeleportService:Teleport(game.PlaceId, LP)
 end
 
-local function restoreAllHitboxes()
-    for root, orig in pairs(OriginalPartsRegistry) do
-        if root and root.Parent then
-            pcall(function()
-                root.Size = orig.Size
-                root.Transparency = orig.Transparency
-                root.Color = orig.Color
-                root.Material = orig.Material
-                root.CanCollide = orig.CanCollide
-            end)
-        end
-    end
-end
+local function ServerHop(Reason)
+    if Hopping then return end
+    SendWebhook(nil)
+    StatusLbl.Text = "Deep Cleaning RAM..."
+    table.clear(ChestCache)
+    table.clear(VisitedChests)
+    table.clear(CollectedPositions)
+    for i = 1, 3 do task_wait(0.1) local junk = gcinfo() end
 
---------------------------------------------------------------------------------
--- CLOSEST TARGET & SILENT AIM
---------------------------------------------------------------------------------
-local function getClosestTarget()
-    local myChar = LocalPlayer.Character
-    if not myChar or not isAlive(myChar) then return nil end
-    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-
-    local closestChar = nil
-    local shortestDist = math.huge
-
-    -- Scan Players
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and shouldTarget(player.Character) then
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local dist = (myRoot.Position - root.Position).Magnitude
-                if dist < shortestDist and dist <= (SuiteConfig.HitboxSize * 3 + 120) then
-                    shortestDist = dist
-                    closestChar = player.Character
-                end
-            end
-        end
+    if getgenv().Config.StopOnRareItem and CheckRareItems() then
+        StatusLbl.Text = "RARE ITEM FOUND! STOPPED."
+        SendWebhook("God's Chalice / Fist")
+        Hopping = true
+        return
     end
 
-    -- Scan Hostile NPCs if enabled
-    if SuiteConfig.TargetMode ~= "Players" and workspace:FindFirstChild("Enemies") then
-        for _, enemy in ipairs(workspace.Enemies:GetChildren()) do
-            if shouldTarget(enemy) then
-                local root = enemy:FindFirstChild("HumanoidRootPart")
-                if root then
-                    local dist = (myRoot.Position - root.Position).Magnitude
-                    if dist < shortestDist and dist <= (SuiteConfig.HitboxSize * 3 + 120) then
-                        shortestDist = dist
-                        closestChar = enemy
+    Hopping = true
+    StatusLbl.Text = "Cooling Down (3s)..."
+    task_wait(3) 
+    StatusLbl.Text = "Searching Server..."
+    
+    local PlaceID = game.PlaceId
+    local AllIDs = {}
+    local actualHour = os.date("!*t").hour
+    pcall(function() AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json")) end)
+    if not AllIDs or tonumber(AllIDs[1]) ~= actualHour then AllIDs = {actualHour} end
+    table.insert(AllIDs, game.JobId)
+    pcall(function() writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs)) end)
+    
+    local function Scan()
+        local foundAnything = ""
+        local url = 'https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'
+        while true do
+            local cursorUrl = url .. (foundAnything ~= "" and '&cursor=' .. foundAnything or "")
+            local success, result = pcall(function() return HttpService:JSONDecode(game:HttpGet(cursorUrl)) end)
+            if success and result and result.data then
+                for _, v in pairs(result.data) do
+                    local ID = tostring(v.id)
+                    if v.playing < (v.maxPlayers - 2) and ID ~= game.JobId then
+                        local Possible = true
+                        for _, Existing in pairs(AllIDs) do if ID == tostring(Existing) then Possible = false end end
+                        if Possible then
+                            table.insert(AllIDs, ID)
+                            pcall(function() writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs)) end)
+                            StatusLbl.Text = "Joining " .. v.playing .. "/" .. v.maxPlayers .. "..."
+                            if getgenv().Config.Disable3DRender then pcall(function() RunService:Set3dRenderingEnabled(false) end) end
+                            TeleportService:TeleportToPlaceInstance(PlaceID, ID, LP)
+                            task_wait(15) 
+                        end
                     end
                 end
+                if result.nextPageCursor and result.nextPageCursor ~= "null" then foundAnything = result.nextPageCursor else foundAnything = "" end
+            else
+                task_wait(1.0)
             end
         end
     end
-
-    return closestChar
+    task_spawn(Scan)
 end
 
---------------------------------------------------------------------------------
--- IN-GAME HUD INTERFACE (MATERIAL 3 GLASS)
---------------------------------------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BF_PvPSuite_Gui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999999
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = GuiParent
+-- ==================================================================
+-- [4] FARMING LOGIC
+-- ==================================================================
+local function StoreFruit(fruit)
+    if not fruit or not fruit:FindFirstChild("Handle") then return end
+    local fruitName = fruit:GetAttribute("OriginalName") or fruit.Name
+    table.insert(CollectedFruits, fruitName)
+    FruitLbl.Text = "Fruit: " .. table.concat(CollectedFruits, ", ")
+    FruitLbl.TextColor3 = Color3.fromRGB(0, 255, 255)
+    
+    local OldCFrame = LP.Character.HumanoidRootPart.CFrame
+    LP.Character.HumanoidRootPart.CFrame = fruit.Handle.CFrame
+    task_wait(0.2)
+    firetouchinterest(LP.Character.HumanoidRootPart, fruit.Handle, 0)
+    firetouchinterest(LP.Character.HumanoidRootPart, fruit.Handle, 1)
+    pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("StoreFruit", fruitName, fruit) end)
+    task_wait(0.2)
+    LP.Character.HumanoidRootPart.CFrame = OldCFrame
+end
 
--- Main Draggable Card
-local MainCard = Instance.new("Frame")
-MainCard.Name = "MainCard"
-MainCard.Size = UDim2.new(0, 320, 0, 390)
-MainCard.Position = UDim2.new(0.5, -160, 0.3, -100)
-MainCard.BackgroundColor3 = Color3.fromRGB(11, 15, 25)
-MainCard.BorderSizePixel = 0
-MainCard.Active = true
-MainCard.Draggable = true
-MainCard.Parent = ScreenGui
-
-local CardCorner = Instance.new("UICorner")
-CardCorner.CornerRadius = UDim.new(0, 16)
-CardCorner.Parent = MainCard
-
-local CardStroke = Instance.new("UIStroke")
-CardStroke.Color = Color3.fromRGB(56, 189, 248)
-CardStroke.Thickness = 1.5
-CardStroke.Transparency = 0.3
-CardStroke.Parent = MainCard
-
--- Header Title
-local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 48)
-Header.BackgroundTransparency = 1
-Header.Parent = MainCard
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -60, 1, 0)
-Title.Position = UDim2.new(0, 16, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "⚔️ BF PvP Suite v3.2"
-Title.TextColor3 = Color3.fromRGB(240, 246, 252)
-Title.TextSize = 15
-Title.Font = Enum.Font.GothamBold
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = Header
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -38, 0, 9)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 68, 68)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 13
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = Header
-
-local CloseBtnCorner = Instance.new("UICorner")
-CloseBtnCorner.CornerRadius = UDim.new(0, 8)
-CloseBtnCorner.Parent = CloseBtn
-
--- Content Layout
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -24, 1, -60)
-Content.Position = UDim2.new(0, 12, 0, 50)
-Content.BackgroundTransparency = 1
-Content.Parent = MainCard
-
-local UIList = Instance.new("UIListLayout")
-UIList.Padding = UDim.new(0, 10)
-UIList.SortOrder = Enum.SortOrder.LayoutOrder
-UIList.Parent = Content
-
--- 1. Hitbox Toggle Button
-local HitboxToggleBtn = Instance.new("TextButton")
-HitboxToggleBtn.Size = UDim2.new(1, 0, 0, 42)
-HitboxToggleBtn.BackgroundColor3 = SuiteConfig.HitboxEnabled and Color3.fromRGB(16, 185, 129) or Color3.fromRGB(30, 41, 59)
-HitboxToggleBtn.Text = SuiteConfig.HitboxEnabled and "✓ Hitbox Expander: ACTIVE" or "✕ Hitbox Expander: OFF"
-HitboxToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-HitboxToggleBtn.TextSize = 13
-HitboxToggleBtn.Font = Enum.Font.GothamBold
-HitboxToggleBtn.Parent = Content
-
-local HitboxBtnCorner = Instance.new("UICorner")
-HitboxBtnCorner.CornerRadius = UDim.new(0, 10)
-HitboxBtnCorner.Parent = HitboxToggleBtn
-
-HitboxToggleBtn.MouseButton1Click:Connect(function()
-    SuiteConfig.HitboxEnabled = not SuiteConfig.HitboxEnabled
-    HitboxToggleBtn.BackgroundColor3 = SuiteConfig.HitboxEnabled and Color3.fromRGB(16, 185, 129) or Color3.fromRGB(30, 41, 59)
-    HitboxToggleBtn.Text = SuiteConfig.HitboxEnabled and "✓ Hitbox Expander: ACTIVE" or "✕ Hitbox Expander: OFF"
-    if not SuiteConfig.HitboxEnabled then
-        restoreAllHitboxes()
+local function UpdateCache()
+    if os_time() - LastCacheRefresh < 1.5 then return end
+    LastCacheRefresh = os_time()
+    table.clear(ChestCache)
+    for _, v in pairs(workspace:GetDescendants()) do
+        if (v.Name:find("Chest") or v.Name:find("Box")) and v:IsA("Part") then table.insert(ChestCache, v) end
     end
-end)
+end
 
--- 2. Hitbox Size Stepper (15, 25, 35, 50 studs)
-local SizeFrame = Instance.new("Frame")
-SizeFrame.Size = UDim2.new(1, 0, 0, 48)
-SizeFrame.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
-SizeFrame.Parent = Content
+local function MainFarm()
+    if not Farming or Hopping then return end
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    UpdateCache()
 
-local SizeFrameCorner = Instance.new("UICorner")
-SizeFrameCorner.CornerRadius = UDim.new(0, 10)
-SizeFrameCorner.Parent = SizeFrame
-
-local SizeLabel = Instance.new("TextLabel")
-SizeLabel.Size = UDim2.new(0.5, 0, 1, 0)
-SizeLabel.Position = UDim2.new(0, 12, 0, 0)
-SizeLabel.BackgroundTransparency = 1
-SizeLabel.Text = "Hitbox Size: " .. SuiteConfig.HitboxSize .. " studs"
-SizeLabel.TextColor3 = Color3.fromRGB(203, 213, 225)
-SizeLabel.TextSize = 12
-SizeLabel.Font = Enum.Font.GothamMedium
-SizeLabel.TextXAlignment = Enum.TextXAlignment.Left
-SizeLabel.Parent = SizeFrame
-
-local StepSizeBtn = Instance.new("TextButton")
-StepSizeBtn.Size = UDim2.new(0, 100, 0, 32)
-StepSizeBtn.Position = UDim2.new(1, -108, 0, 8)
-StepSizeBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
-StepSizeBtn.Text = "Cycle Size ↺"
-StepSizeBtn.TextColor3 = Color3.fromRGB(56, 189, 248)
-StepSizeBtn.TextSize = 11
-StepSizeBtn.Font = Enum.Font.GothamBold
-StepSizeBtn.Parent = SizeFrame
-
-local StepCorner = Instance.new("UICorner")
-StepCorner.CornerRadius = UDim.new(0, 8)
-StepCorner.Parent = StepSizeBtn
-
-local sizes = { 15, 25, 35, 50 }
-local sizeIdx = 2
-StepSizeBtn.MouseButton1Click:Connect(function()
-    sizeIdx = (sizeIdx % #sizes) + 1
-    SuiteConfig.HitboxSize = sizes[sizeIdx]
-    SizeLabel.Text = "Hitbox Size: " .. SuiteConfig.HitboxSize .. " studs"
-end)
-
--- 3. Target Filter Mode (Players -> Enemies -> All)
-local ModeBtn = Instance.new("TextButton")
-ModeBtn.Size = UDim2.new(1, 0, 0, 42)
-ModeBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
-ModeBtn.Text = "🎯 Target Filter: [" .. SuiteConfig.TargetMode .. "]"
-ModeBtn.TextColor3 = Color3.fromRGB(240, 246, 252)
-ModeBtn.TextSize = 12
-ModeBtn.Font = Enum.Font.GothamBold
-ModeBtn.Parent = Content
-
-local ModeCorner = Instance.new("UICorner")
-ModeCorner.CornerRadius = UDim.new(0, 10)
-ModeCorner.Parent = ModeBtn
-
-local modes = { "Players", "Enemies", "All" }
-local modeIdx = 1
-ModeBtn.MouseButton1Click:Connect(function()
-    modeIdx = (modeIdx % #modes) + 1
-    SuiteConfig.TargetMode = modes[modeIdx]
-    ModeBtn.Text = "🎯 Target Filter: [" .. SuiteConfig.TargetMode .. "]"
-    restoreAllHitboxes()
-end)
-
--- 4. Silent Aim & Assist Toggle
-local AimBtn = Instance.new("TextButton")
-AimBtn.Size = UDim2.new(1, 0, 0, 42)
-AimBtn.BackgroundColor3 = SuiteConfig.SilentAimEnabled and Color3.fromRGB(99, 102, 241) or Color3.fromRGB(30, 41, 59)
-AimBtn.Text = SuiteConfig.SilentAimEnabled and "⚡ Silent Aim & FOV Assist: ON" or "⚡ Silent Aim: OFF"
-AimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-AimBtn.TextSize = 12
-AimBtn.Font = Enum.Font.GothamBold
-AimBtn.Parent = Content
-
-local AimCorner = Instance.new("UICorner")
-AimCorner.CornerRadius = UDim.new(0, 10)
-AimCorner.Parent = AimBtn
-
-AimBtn.MouseButton1Click:Connect(function()
-    SuiteConfig.SilentAimEnabled = not SuiteConfig.SilentAimEnabled
-    AimBtn.BackgroundColor3 = SuiteConfig.SilentAimEnabled and Color3.fromRGB(99, 102, 241) or Color3.fromRGB(30, 41, 59)
-    AimBtn.Text = SuiteConfig.SilentAimEnabled and "⚡ Silent Aim & FOV Assist: ON" or "⚡ Silent Aim: OFF"
-end)
-
--- 5. Floating Touch Toggle Indicator (for Mobile / Tablets)
-local FloatingToggle = Instance.new("TextButton")
-FloatingToggle.Name = "FloatingToggle"
-FloatingToggle.Size = UDim2.new(0, 50, 0, 50)
-FloatingToggle.Position = UDim2.new(0.02, 0, 0.45, 0)
-FloatingToggle.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
-FloatingToggle.Text = "⚔️"
-FloatingToggle.TextSize = 22
-FloatingToggle.Active = true
-FloatingToggle.Draggable = true
-FloatingToggle.Parent = ScreenGui
-
-local FloatCorner = Instance.new("UICorner")
-FloatCorner.CornerRadius = UDim.new(1, 0)
-FloatCorner.Parent = FloatingToggle
-
-local FloatStroke = Instance.new("UIStroke")
-FloatStroke.Color = Color3.fromRGB(56, 189, 248)
-FloatStroke.Thickness = 2
-FloatStroke.Parent = FloatingToggle
-
-FloatingToggle.MouseButton1Click:Connect(function()
-    MainCard.Visible = not MainCard.Visible
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    MainCard.Visible = false
-end)
-
--- Keybind Toggle
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == SuiteConfig.Keybind then
-        MainCard.Visible = not MainCard.Visible
-    end
-end)
-
---------------------------------------------------------------------------------
--- CONTINUOUS HEARTBEAT LOOP (HITBOX & TARGET ASSIST)
---------------------------------------------------------------------------------
-RunService.Heartbeat:Connect(function()
-    if SuiteConfig.HitboxEnabled then
-        -- Process Players
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                expandHitbox(player.Character)
-            end
-        end
-
-        -- Process Enemies NPC if selected
-        if SuiteConfig.TargetMode ~= "Players" and workspace:FindFirstChild("Enemies") then
-            for _, enemy in ipairs(workspace.Enemies:GetChildren()) do
-                expandHitbox(enemy)
-            end
+    -- Fruit
+    if Config.FarmFruit then
+        for _, v in pairs(Workspace:GetChildren()) do
+            if v:IsA("Tool") and string.find(v.Name, "Fruit") then StoreFruit(v) end
         end
     end
-end)
 
--- Silent Aim Target Alignment Assist
-RunService.RenderStepped:Connect(function()
-    if SuiteConfig.SilentAimEnabled and LocalPlayer.Character and isAlive(LocalPlayer.Character) then
-        local target = getClosestTarget()
-        if target then
-            local targetRoot = target:FindFirstChild("HumanoidRootPart")
-            if targetRoot and Camera then
-                -- Direct assist line to lock target within field of view
-                local _, onScreen = Camera:WorldToViewportPoint(targetRoot.Position)
-                if onScreen then
-                    -- Subtle target lock indicator
-                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetRoot.Position), 0.05)
+    -- Chests
+    local target, minDist = nil, math_huge
+    if Config.FarmChests then
+        for _, v in pairs(ChestCache) do
+            if v and v.Parent then
+                local dist = (v.Position - root.Position).Magnitude
+                if dist < Config.MaxFarmDistance and not VisitedChests[v] then
+                    local isDup = false
+                    for _, pos in pairs(CollectedPositions) do if (v.Position - pos).Magnitude < 5 then isDup = true break end end
+                    if not isDup and dist < minDist then target = v minDist = dist end
                 end
             end
         end
     end
+
+    if target then
+        IsMoving = true
+        StatusLbl.Text = "Chest: " .. math_floor(minDist) .. "m"
+        StatusLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        local tween = TweenService:Create(root, TweenInfo.new(minDist/Config.TweenSpeed, Enum.EasingStyle.Linear), {CFrame = target.CFrame})
+        tween:Play()
+        while tween.PlaybackState == Enum.PlaybackState.Playing do 
+            if not Farming or Hopping then tween:Cancel() return end 
+            task_wait(0.05) 
+        end
+        if target.Parent and (target.Position - root.Position).Magnitude < 15 then
+            firetouchinterest(root, target, 0)
+            firetouchinterest(root, target, 1)
+            pcall(function() fireclickdetector(target:FindFirstChildOfClass("ClickDetector")) end)
+            VisitedChests[target] = true
+            table.insert(CollectedPositions, target.Position)
+            Stats.Chests = Stats.Chests + 1
+            ChestsLbl.Text = "Chests: "..Stats.Chests
+            task_wait(Config.CollectionWait)
+        end
+        IsMoving = false
+    else
+        StatusLbl.Text = "Finished! Hopping..."
+        if Stats.Chests > 0 then SendWebhook(nil) end
+        task_wait(3) 
+        ServerHop("Finished")
+    end
+end
+
+-- Button Logic
+ToggleBtn.MouseButton1Click:Connect(function() Farming = not Farming; ToggleBtn.Text = Farming and "ON" or "OFF"; ToggleBtn.BackgroundColor3 = Farming and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(180, 40, 40) end)
+HopBtn.MouseButton1Click:Connect(function() Hopping = false; ServerHop("Manual") end)
+AFKBtn.MouseButton1Click:Connect(function() BlurFrame.Visible = not BlurFrame.Visible; AFKBtn.BackgroundColor3 = BlurFrame.Visible and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(180, 40, 40) end)
+
+-- Initial Render Button State check
+if Config.Disable3DRender then
+    RenderBtn.Text = "3d Rend: ON"
+    RenderBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    pcall(function() RunService:Set3dRenderingEnabled(false) end)
+else
+    RenderBtn.Text = "3d Rend: OFF"
+    RenderBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    pcall(function() RunService:Set3dRenderingEnabled(true) end)
+end
+
+RenderBtn.MouseButton1Click:Connect(function() 
+    Config.Disable3DRender = not Config.Disable3DRender
+    local State = Config.Disable3DRender
+    RenderBtn.Text = State and "3d Rend: ON" or "3d Rend: OFF"
+    RenderBtn.BackgroundColor3 = State and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(180, 40, 40)
+    pcall(function() RunService:Set3dRenderingEnabled(not State) end) 
 end)
 
-print("[BF PvP Suite]: Successfully initialized with 100% Client-Side Luau Engine!")
+-- Loops
+task_spawn(function() while true do if Farming and not Hopping then pcall(MainFarm) end task_wait(0.1) end end)
+task_spawn(function() while true do TimerLbl.Text = string.format("Time: %02d:%02d:%02d", math_floor((os_time()-Stats.StartTime)/3600), math_floor(((os_time()-Stats.StartTime)%3600)/60), (os_time()-Stats.StartTime)%60); task_wait(1) end end)
+task_spawn(function() task_wait(2); SendWebhook("Start") end)
 `;
